@@ -3,6 +3,12 @@
 TikTokゲーム配信向けのコメント読み上げデスクトップアプリです。
 TikTokライブのコメントをリアルタイムで取得し、Style-Bert-VITS2で自然に読み上げます。
 
+## ダウンロード
+
+最新版は [Releases](https://github.com/Nicolas0315/tiktalk/releases) からダウンロードできます。
+
+`TikTalk-Setup-X.X.X.exe` をダウンロードして実行してください。
+
 ## 必要なもの
 
 - **Node.js** (v18以上): https://nodejs.org/

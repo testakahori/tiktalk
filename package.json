@@ -1,6 +1,6 @@
 {
   "name": "tiktalk",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "TikTokゲーム配信向け読み上げデスクトップアプリ",
   "main": "electron/main.js",
   "scripts": {
@@ -9,7 +9,10 @@
     "build:renderer": "vite build",
     "build:exe": "npm run build:renderer && electron-builder",
     "build": "npm run build:exe",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "release:patch": "npm version patch && git push && git push --tags",
+    "release:minor": "npm version minor && git push && git push --tags",
+    "release:major": "npm version major && git push && git push --tags"
   },
   "build": {
     "appId": "com.tiktalk.app",
@@ -35,6 +38,11 @@
     "nsis": {
       "oneClick": true,
       "allowToChangeInstallationDirectory": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Nicolas0315",
+      "repo": "tiktalk"
     }
   },
   "devDependencies": {

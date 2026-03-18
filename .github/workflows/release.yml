@@ -1,0 +1,57 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer (Vite)
+        run: npm run build:renderer
+
+      - name: Build exe (electron-builder)
+        run: npm run build:exe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.exe
+          body: |
+            ## TikTalk ${{ github.ref_name }}
+
+            ### インストール方法
+            1. `TikTalk-Setup-*.exe` をダウンロード
+            2. ダウンロードしたファイルを実行
+            3. インストーラーの指示に従ってインストール
+
+            ### 必要なもの
+            - Style-Bert-VITS2（ローカルTTSサーバー）
+            - Python 3.10以上
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
