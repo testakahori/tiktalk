@@ -16,11 +16,9 @@ log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
 log.transports.console.level = process.env.NODE_ENV === 'development' ? 'debug' : 'warn';
 
 // uncaught例外もキャプチャ
-log.catchErrors({
-  showDialog: false,
-  onError(error) {
-    log.error('[UncaughtError]', error.message, error.stack);
-  },
+// uncaught例外をキャプチャ（v4スタイル）
+process.on('uncaughtException', (error) => {
+  log.error('[UncaughtError]', error.message, error.stack);
 });
 
 log.info('========== TikTalk 起動 ==========');
@@ -412,7 +410,7 @@ ipcMain.on('add-user-dict', (_event, { userId, reading }) => {
 
 // ログファイルを開く
 ipcMain.handle('open-log-file', async () => {
-  const logPath = log.transports.file.getFile().path;
+  const logPath = log.transports.file.file;
   log.info('[IPC] ログファイルを開く:', logPath);
   await shell.openPath(logPath);
   return logPath;
@@ -420,7 +418,7 @@ ipcMain.handle('open-log-file', async () => {
 
 // ログパスを取得（UIに表示用）
 ipcMain.handle('get-log-path', () => {
-  return log.transports.file.getFile().path;
+  return log.transports.file.file;
 });
 
 // セットアップ用IPC
@@ -448,7 +446,7 @@ app.whenReady().then(() => {
 });
 
 app.on('ready', () => {
-  log.info(`[App] ログファイル: ${log.transports.file.getFile().path}`);
+  log.info(`[App] ログファイル: ${log.transports.file.file}`);
 });
 
 app.on('window-all-closed', () => {
