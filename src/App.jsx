@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import SetupWizard from './SetupWizard';
+import SettingsPanel from './components/SettingsPanel';
+import CommentLog from './components/CommentLog';
+import StatusBar from './components/StatusBar';
 
 const styles = {
   app: {
@@ -11,11 +14,24 @@ const styles = {
     minHeight: '100vh',
     color: '#eee',
   },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
   title: {
-    textAlign: 'center',
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 4,
+  },
+  settingsBtn: {
+    background: 'none',
+    border: '1px solid #333',
+    borderRadius: 6,
+    color: '#aaa',
+    fontSize: 14,
+    padding: '6px 12px',
+    cursor: 'pointer',
   },
   subtitle: {
     textAlign: 'center',
@@ -83,76 +99,34 @@ const styles = {
     opacity: 0.5,
     cursor: 'not-allowed',
   },
-  status: {
-    textAlign: 'center',
-    fontSize: 13,
-    marginBottom: 16,
-    padding: '6px 0',
-  },
-  statusConnected: {
-    color: '#44ee88',
-  },
-  statusDisconnected: {
-    color: '#888',
-  },
-  statusError: {
-    color: '#ee4444',
-  },
   logTitle: {
     fontSize: 14,
     color: '#aaa',
     marginBottom: 8,
   },
-  logBox: {
-    background: '#0f0f23',
-    borderRadius: 8,
-    border: '1px solid #222',
-    padding: '12px',
-    height: 300,
-    overflowY: 'auto',
-  },
-  logItem: {
-    fontSize: 13,
-    marginBottom: 6,
-    lineHeight: 1.5,
-  },
-  logUser: {
-    color: '#e94560',
-    fontWeight: 'bold',
-  },
-  logComment: {
-    color: '#ddd',
-  },
-  empty: {
-    color: '#555',
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 40,
-  },
-};
-
-const TYPE_ICONS = {
-  gift: '\uD83C\uDF81',
-  member: '\uD83D\uDC4B',
-  chat: '\uD83D\uDCAC',
 };
 
 function App() {
-  const [setupCompleted, setSetupCompleted] = useState(null); // null=未確認, true/false
+  const [setupCompleted, setSetupCompleted] = useState(null);
   const [username, setUsername] = useState('');
   const [running, setRunning] = useState(false);
   const [connectedUser, setConnectedUser] = useState('');
-  const [status, setStatus] = useState('stopped'); // stopped | connected | disconnected | error | speaking | idle
+  const [status, setStatus] = useState('stopped');
   const [errorMsg, setErrorMsg] = useState('');
   const [comments, setComments] = useState([]);
   const [queueSize, setQueueSize] = useState(0);
   const [ttsWarning, setTtsWarning] = useState(false);
-  const logRef = useRef(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState({
+    speakerId: 0,
+    speed: 1.0,
+    ngWords: [],
+    userDict: {},
+  });
 
   // セットアップ状態の確認
   useEffect(() => {
     if (!window.tiktalk?.onSetupState) {
-      // Electron外（ブラウザ開発時）はセットアップ済みとみなす
       setSetupCompleted(true);
       return;
     }
@@ -214,13 +188,6 @@ function App() {
     }
   }, []);
 
-  // ログ自動スクロール
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [comments]);
-
   const handleStart = () => {
     const name = username.trim().replace(/^@/, '');
     if (!name) return;
@@ -238,15 +205,9 @@ function App() {
     }
   };
 
-  const statusLabel = () => {
-    if (status === 'connected') return { text: `● ${connectedUser || 'ユーザー'}に接続中`, style: styles.statusConnected };
-    if (status === 'speaking') return { text: `● 読み上げ中（キュー: ${queueSize}）`, style: styles.statusConnected };
-    if (status === 'disconnected') return { text: '○ 切断', style: styles.statusDisconnected };
-    if (status === 'error') return { text: '● エラー', style: styles.statusError };
-    return { text: '○ 停止中', style: styles.statusDisconnected };
+  const handleSettingsChange = (partial) => {
+    setSettings((prev) => ({ ...prev, ...partial }));
   };
-
-  const s = statusLabel();
 
   // セットアップ状態確認中
   if (setupCompleted === null) {
@@ -257,20 +218,33 @@ function App() {
     );
   }
 
-  // セットアップ未完了 → ウィザード表示
+  // セットアップ未完了
   if (!setupCompleted) {
     return <SetupWizard onComplete={() => setSetupCompleted(true)} />;
   }
 
   return (
     <div style={styles.app}>
-      <div style={styles.title}>TikTalk 🎮</div>
+      <div style={styles.header}>
+        <div style={styles.title}>TikTalk 🎮</div>
+        <button style={styles.settingsBtn} onClick={() => setSettingsOpen(true)}>
+          設定 ⚙
+        </button>
+      </div>
       <div style={styles.subtitle}>TikTokライブ読み上げツール</div>
 
       {ttsWarning && (
         <div style={styles.warning}>
           ⚠ Style-Bert-VITS2 が起動していません（localhost:5000）。
           読み上げを使うにはTTSサーバーを先に起動してください。
+        </div>
+      )}
+
+      <StatusBar status={status} connectedUser={connectedUser} queueSize={queueSize} />
+
+      {status === 'error' && errorMsg && (
+        <div style={{ ...styles.warning, background: '#330000', borderColor: '#660000', color: '#ff6666' }}>
+          {errorMsg}
         </div>
       )}
 
@@ -304,28 +278,15 @@ function App() {
         </button>
       </div>
 
-      <div style={{ ...styles.status, ...s.style }}>{s.text}</div>
-
-      {status === 'error' && errorMsg && (
-        <div style={{ ...styles.warning, background: '#330000', borderColor: '#660000', color: '#ff6666' }}>
-          {errorMsg}
-        </div>
-      )}
-
       <div style={styles.logTitle}>コメントログ</div>
-      <div style={styles.logBox} ref={logRef}>
-        {comments.length === 0 ? (
-          <div style={styles.empty}>コメントを待っています...</div>
-        ) : (
-          comments.map((c, i) => (
-            <div key={i} style={styles.logItem}>
-              <span>{TYPE_ICONS[c.type] || TYPE_ICONS.chat} </span>
-              <span style={styles.logUser}>{c.username || c.user}</span>
-              <span style={styles.logComment}>: {c.text || c.comment}</span>
-            </div>
-          ))
-        )}
-      </div>
+      <CommentLog comments={comments} />
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onSettingsChange={handleSettingsChange}
+      />
     </div>
   );
 }
