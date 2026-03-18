@@ -3,6 +3,7 @@
 
 const { WebcastPushConnection } = require("tiktok-live-connector");
 const EventEmitter = require("events");
+const log = require("electron-log");
 
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_DELAY_MS = 5000;
@@ -90,9 +91,11 @@ class TikTokManager extends EventEmitter {
         this.emit("error", err);
       });
 
+      log.info(`[TikTok] connect() 呼び出し: @${this._username}`);
       await this._connection.connect();
     } catch (err) {
       this._connected = false;
+      log.error(`[TikTok] 接続失敗: @${this._username}`, err.message);
       this.emit("error", err);
       this._tryReconnect();
     }
@@ -100,11 +103,13 @@ class TikTokManager extends EventEmitter {
 
   _tryReconnect() {
     if (this._reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      log.error(`[TikTok] 再接続の最大回数(${MAX_RECONNECT_ATTEMPTS})に達しました`);
       this.emit("error", new Error("再接続の最大回数に達しました"));
       return;
     }
 
     this._reconnectAttempts++;
+    log.warn(`[TikTok] 再接続試行 ${this._reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} (${RECONNECT_DELAY_MS}ms後)`);
     this._reconnectTimer = setTimeout(() => {
       this._doConnect();
     }, RECONNECT_DELAY_MS);

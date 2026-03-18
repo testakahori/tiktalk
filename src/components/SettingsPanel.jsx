@@ -337,6 +337,20 @@ export default function SettingsPanel({ open, onClose, settings, onSettingsChang
           </div>
         </div>
       </div>
+
+      {/* ログ操作 */}
+      <div style={styles.section}>
+        <div style={styles.sectionTitle}>🛠️ デバッグ</div>
+        <button
+          style={{ ...styles.addBtn, width: '100%', padding: '8px 0', fontSize: 13 }}
+          onClick={() => window.tiktalk.openLogFile()}
+        >
+          📋 ログファイルを開く
+        </button>
+        <p style={{ color: '#666', fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+          不具合が起きたとき、このログファイルを開発者に送ると原因を特定しやすくなります
+        </p>
+      </div>
     </>
   );
 }

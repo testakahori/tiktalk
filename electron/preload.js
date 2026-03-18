@@ -93,4 +93,12 @@ contextBridge.exposeInMainWorld('tiktalk', {
   onSetupCompleted: (callback) => {
     ipcRenderer.on('setup-completed', (_event) => callback());
   },
+
+  // --- ログ操作 ---
+
+  // ログファイルをエクスプローラー/Finderで開く
+  openLogFile: () => ipcRenderer.invoke('open-log-file'),
+
+  // ログファイルのパスを取得（UI表示用）
+  getLogPath: () => ipcRenderer.invoke('get-log-path'),
 });

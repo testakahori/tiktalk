@@ -244,7 +244,22 @@ function App() {
 
       {status === 'error' && errorMsg && (
         <div style={{ ...styles.warning, background: '#330000', borderColor: '#660000', color: '#ff6666' }}>
-          {errorMsg}
+          <span>{errorMsg}</span>
+          <button
+            onClick={() => window.tiktalk.openLogFile()}
+            style={{
+              marginLeft: 12,
+              padding: '2px 10px',
+              background: '#550000',
+              color: '#ffaaaa',
+              border: '1px solid #880000',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 12,
+            }}
+          >
+            📋 ログを開く
+          </button>
         </div>
       )}
 

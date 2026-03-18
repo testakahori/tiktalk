@@ -1,10 +1,31 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const http = require('http');
 const ElectronStore = require('electron-store');
+const log = require('electron-log');
+
+// --- ログ設定 ---
+// ファイル: %AppData%/TikTalk/logs/main.log (Windows)
+//           ~/Library/Logs/TikTalk/main.log  (macOS)
+log.transports.file.level = 'debug';
+log.transports.file.maxSize = 5 * 1024 * 1024; // 5MB
+log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
+log.transports.console.level = process.env.NODE_ENV === 'development' ? 'debug' : 'warn';
+
+// uncaught例外もキャプチャ
+log.catchErrors({
+  showDialog: false,
+  onError(error) {
+    log.error('[UncaughtError]', error.message, error.stack);
+  },
+});
+
+log.info('========== TikTalk 起動 ==========');
+log.info(`バージョン: ${require('../package.json').version}`);
+log.info(`OS: ${process.platform} ${process.arch}`);
 
 const { CommentFilter } = require('../core/filter.js');
 const { CommentFormatter } = require('../core/formatter.js');
@@ -106,18 +127,19 @@ function startPythonProcess(username) {
   pythonProcess.stderr.on('data', (data) => {
     const text = data.toString('utf-8').trim();
     if (text) {
-      console.error('[Python]', text);
+      log.error('[Python]', text);
       mainWindow?.webContents.send('status', { type: 'error', message: text });
     }
   });
 
   pythonProcess.on('close', (code) => {
+    log.info(`[Python] プロセス終了 code=${code}`);
     pythonProcess = null;
     mainWindow?.webContents.send('status', { type: 'stopped', code });
   });
 
   pythonProcess.on('error', (err) => {
-    console.error('[Python起動エラー]', err.message);
+    log.error('[Python起動エラー]', err.message);
     mainWindow?.webContents.send('status', { type: 'error', message: `Python起動失敗: ${err.message}` });
     pythonProcess = null;
   });
@@ -172,7 +194,7 @@ function runSetupWizard(action) {
   });
 
   setupProcess.stderr.on('data', (data) => {
-    console.error('[Setup]', data.toString('utf-8').trim());
+    log.error('[Setup]', data.toString('utf-8').trim());
   });
 
   setupProcess.on('close', () => {
@@ -199,6 +221,7 @@ function initPipeline() {
   const speakerId = store.get('speakerId', 0);
   const speed = store.get('speed', 1.0);
   const ttsBaseUrl = store.get('ttsBaseUrl', 'http://localhost:5000');
+  log.info(`[Pipeline] 初期化 speakerId=${speakerId} speed=${speed} ttsBaseUrl=${ttsBaseUrl} ngWords=${ngWords.length}件`);
 
   filter = new CommentFilter(ngWords);
   formatter = new CommentFormatter();
@@ -245,7 +268,7 @@ async function processNextComment() {
       try {
         await player.play(wavPath);
       } catch (err) {
-        console.error('[AudioPlayer]', err.message);
+        log.error('[AudioPlayer]', err.message);
       }
     }
     mainWindow?.webContents.send('status', { type: 'idle' });
@@ -293,15 +316,17 @@ function startTikTok(username) {
   });
 
   tiktokManager.on('connected', () => {
+    log.info(`[TikTok] 接続成功: @${username}`);
     mainWindow?.webContents.send('status', { type: 'connected', message: `${username} に接続しました` });
   });
 
   tiktokManager.on('disconnected', () => {
+    log.warn(`[TikTok] 切断: @${username}`);
     mainWindow?.webContents.send('status', { type: 'disconnected', message: '切断されました。再接続中...' });
   });
 
   tiktokManager.on('error', (err) => {
-    console.error('[TikTok]', err.message || err);
+    log.error('[TikTok]', err.message || err);
     mainWindow?.webContents.send('status', { type: 'error', message: err.message || String(err) });
   });
 
@@ -385,6 +410,19 @@ ipcMain.on('add-user-dict', (_event, { userId, reading }) => {
   }
 });
 
+// ログファイルを開く
+ipcMain.handle('open-log-file', async () => {
+  const logPath = log.transports.file.getFile().path;
+  log.info('[IPC] ログファイルを開く:', logPath);
+  await shell.openPath(logPath);
+  return logPath;
+});
+
+// ログパスを取得（UIに表示用）
+ipcMain.handle('get-log-path', () => {
+  return log.transports.file.getFile().path;
+});
+
 // セットアップ用IPC
 ipcMain.on('run-setup', (_event, action) => {
   runSetupWizard(action);
@@ -400,11 +438,17 @@ ipcMain.on('setup-done', () => {
 
 // セットアップ済みか確認してから起動
 app.whenReady().then(() => {
+  log.info('[App] ウィンドウ作成');
   createWindow();
   mainWindow.webContents.on('did-finish-load', () => {
     const setupDone = fs.existsSync(SETUP_FLAG);
+    log.info(`[App] ロード完了 setupDone=${setupDone}`);
     mainWindow.webContents.send('setup-state', { setupDone });
   });
+});
+
+app.on('ready', () => {
+  log.info(`[App] ログファイル: ${log.transports.file.getFile().path}`);
 });
 
 app.on('window-all-closed', () => {

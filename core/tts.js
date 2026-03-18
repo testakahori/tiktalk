@@ -5,6 +5,7 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const log = require("electron-log");
 
 class TTSEngine {
   /**
@@ -43,7 +44,7 @@ class TTSEngine {
       fs.writeFileSync(tempFile, Buffer.from(response.data));
       return tempFile;
     } catch (err) {
-      console.error("TTSEngine.speak error:", err.message);
+      log.error("[TTS] speak エラー:", err.message, `text="${text.slice(0, 30)}..."`);
       return null;
     }
   }
@@ -92,7 +93,7 @@ class TTSEngine {
       }
       return speakers;
     } catch (err) {
-      console.error("TTSEngine.getSpeakers error:", err.message);
+      log.error("[TTS] getSpeakers エラー:", err.message);
       return [];
     }
   }
