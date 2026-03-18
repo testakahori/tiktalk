@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:electron": "npm run dev & sleep 2 && electron .",
+    "preinstall": "node scripts/generate-icon.js || true",
     "build:renderer": "vite build",
     "build:exe": "npm run build:renderer && electron-builder",
     "build": "npm run build:exe",
@@ -22,7 +23,9 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "core/**/*",
+      "node_modules/**/*"
     ],
     "extraResources": [
       {
@@ -38,8 +41,19 @@
       "icon": "public/icon.png"
     },
     "nsis": {
-      "oneClick": true,
-      "allowToChangeInstallationDirectory": false
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": [
+        "ja"
+      ],
+      "language": "1041",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TikTalk",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false
     },
     "publish": {
       "provider": "github",
@@ -51,6 +65,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
+    "sharp": "^0.34.5",
     "vite": "^6.0.7"
   },
   "dependencies": {

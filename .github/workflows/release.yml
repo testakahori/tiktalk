@@ -30,6 +30,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install sharp for icon generation
+        run: npm install --save-dev sharp
+
+      - name: Generate app icon
+        run: node scripts/generate-icon.js
+
+      - name: Verify icon files
+        run: |
+          dir public
+          dir build
+
       - name: Build renderer (Vite)
         run: npm run build:renderer
 
@@ -37,6 +48,11 @@ jobs:
         run: npm run build:exe
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show build output
+        run: |
+          dir release
+          forfiles /P release /M *.exe /C "cmd /c echo @fname @fsize bytes"
 
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -48,10 +64,14 @@ jobs:
             ### インストール方法
             1. `TikTalk-Setup-*.exe` をダウンロード
             2. ダウンロードしたファイルを実行
-            3. インストーラーの指示に従ってインストール
+            3. インストーラーの指示に従ってインストール（インストール先を選択可能）
 
             ### 必要なもの
             - Style-Bert-VITS2（ローカルTTSサーバー）
             - Python 3.10以上
+
+            ### システム要件
+            - Windows 10 以上
+            - GPU推奨（Style-Bert-VITS2の音声合成に使用）
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
