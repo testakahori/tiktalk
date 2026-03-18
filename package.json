@@ -1,0 +1,50 @@
+{
+  "name": "tiktalk",
+  "version": "1.0.0",
+  "description": "TikTokゲーム配信向け読み上げデスクトップアプリ",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "npm run dev & sleep 2 && electron .",
+    "build:renderer": "vite build",
+    "build:exe": "npm run build:renderer && electron-builder",
+    "build": "npm run build:exe",
+    "lint": "eslint src/"
+  },
+  "build": {
+    "appId": "com.tiktalk.app",
+    "productName": "TikTalk",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python/",
+        "to": "python/",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false
+    }
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "vite": "^6.0.7"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
