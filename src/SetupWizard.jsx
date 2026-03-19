@@ -1,87 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const styles = {
   container: {
     fontFamily: '"Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif',
     maxWidth: 460,
     margin: '0 auto',
-    padding: '24px 20px',
+    padding: '32px 24px',
     background: '#1a1a2e',
     minHeight: '100vh',
     color: '#eee',
+    boxSizing: 'border-box',
   },
-  title: {
-    textAlign: 'center',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  subtitle: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: '#888',
-    marginBottom: 32,
-  },
-  stepContainer: {
-    marginBottom: 16,
-  },
-  stepHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  stepIcon: {
-    fontSize: 20,
-    width: 28,
-    textAlign: 'center',
-  },
-  stepTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  stepProgress: {
-    fontSize: 12,
-    color: '#888',
-    marginLeft: 'auto',
-  },
-  messageBox: {
+  title: { textAlign: 'center', fontSize: 26, fontWeight: 'bold', marginBottom: 4 },
+  subtitle: { textAlign: 'center', fontSize: 13, color: '#888', marginBottom: 32 },
+  card: {
     background: '#0f0f23',
-    borderRadius: 8,
-    border: '1px solid #222',
-    padding: '10px 14px',
-    fontSize: 13,
-    color: '#ccc',
-    marginBottom: 8,
-    maxHeight: 120,
-    overflowY: 'auto',
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
+    border: '1px solid #2a2a4a',
+    borderRadius: 10,
+    padding: '16px 18px',
+    marginBottom: 14,
   },
-  actionButton: {
-    padding: '10px 20px',
-    borderRadius: 8,
-    border: 'none',
-    background: '#e94560',
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  secondaryButton: {
-    padding: '10px 20px',
-    borderRadius: 8,
-    border: '1px solid #555',
-    background: '#333',
-    color: '#ccc',
-    fontSize: 14,
-    cursor: 'pointer',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  launchButton: {
+  cardTitle: { fontWeight: 'bold', fontSize: 15, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 },
+  cardBody: { fontSize: 13, color: '#aaa', lineHeight: 1.7 },
+  stepRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
+  stepIcon: { fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 },
+  stepLabel: { fontSize: 14, flex: 1 },
+  stepStatus: { fontSize: 12, color: '#888' },
+  bigBtn: {
     display: 'block',
     width: '100%',
     padding: '14px 0',
@@ -89,191 +34,164 @@ const styles = {
     border: 'none',
     background: 'linear-gradient(135deg, #e94560, #c23152)',
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     cursor: 'pointer',
-    marginTop: 24,
+    marginTop: 8,
   },
-  divider: {
-    border: 'none',
-    borderTop: '1px solid #222',
-    margin: '16px 0',
+  smallBtn: {
+    padding: '8px 16px',
+    borderRadius: 6,
+    border: '1px solid #444',
+    background: '#252540',
+    color: '#ccc',
+    fontSize: 13,
+    cursor: 'pointer',
+    marginTop: 8,
+    marginRight: 8,
+  },
+  ok: { color: '#4caf50' },
+  error: { color: '#e94560' },
+  warn: { color: '#ff9800' },
+  tag: {
+    display: 'inline-block',
+    background: '#252540',
+    border: '1px solid #3a3a6a',
+    borderRadius: 4,
+    padding: '1px 8px',
+    fontSize: 11,
+    color: '#aaa',
+    marginRight: 4,
+    marginTop: 4,
   },
 };
 
-const STEP_ICONS = {
-  pending: '⬜',
-  running: '⏳',
-  ok: '✅',
-  error: '❌',
-  waiting: '🔔',
-};
+const STEPS = [
+  { id: 'tts', label: 'Style-Bert-VITS2 の接続確認' },
+  { id: 'done', label: 'セットアップ完了' },
+];
 
-function SetupWizard({ onComplete }) {
-  const [steps, setSteps] = useState({
-    1: { status: 'pending', message: '', action: null, url: null },
-    2: { status: 'pending', message: '', action: null, url: null },
-    3: { status: 'pending', message: '', action: null, url: null },
-  });
-  const [currentStep, setCurrentStep] = useState(0);
-  const [setupDone, setSetupDone] = useState(false);
+export default function SetupWizard({ onComplete }) {
+  const [phase, setPhase] = useState('intro'); // intro | checking | ok | error
+  const [ttsError, setTtsError] = useState('');
 
-  // セットアップ進捗を受信
-  useEffect(() => {
-    if (!window.tiktalk?.onSetupProgress) return;
-
-    window.tiktalk.onSetupProgress((data) => {
-      const { step, status, message, action, url } = data;
-
-      if (step >= 1 && step <= 3) {
-        setSteps((prev) => ({
-          ...prev,
-          [step]: { status, message, action: action || null, url: url || null },
-        }));
-        setCurrentStep(step);
+  // TTS疎通確認（Node.js から localhost:5000 に HTTP確認するだけ）
+  const handleCheck = async () => {
+    setPhase('checking');
+    setTtsError('');
+    try {
+      const ok = await window.tiktalk.checkTTS();
+      if (ok) {
+        setPhase('ok');
+      } else {
+        setPhase('error');
+        setTtsError('localhost:5000 に接続できませんでした。Style-Bert-VITS2 が起動しているか確認してください。');
       }
-
-      // セットアップ完了（Step 4）
-      if (step === 4 && status === 'ok') {
-        setSetupDone(true);
-      }
-    });
-  }, []);
-
-  // セットアップ開始
-  const handleStart = () => {
-    if (window.tiktalk?.runSetup) {
-      window.tiktalk.runSetup();
+    } catch (e) {
+      setPhase('error');
+      setTtsError('確認中にエラーが発生しました: ' + (e?.message || String(e)));
     }
   };
 
-  // TTS再確認
-  const handleCheckTTS = () => {
-    if (window.tiktalk?.checkTTS) {
-      window.tiktalk.checkTTS();
-    }
-  };
-
-  // Python再確認
-  const handleRecheckPython = () => {
-    if (window.tiktalk?.runSetup) {
-      window.tiktalk.runSetup('recheck_python');
-    }
-  };
-
-  // セットアップ完了 → メイン画面へ
   const handleComplete = () => {
-    if (window.tiktalk?.completeSetup) {
-      window.tiktalk.completeSetup();
-    }
+    if (window.tiktalk?.completeSetup) window.tiktalk.completeSetup();
     onComplete();
   };
-
-  const stepNames = {
-    1: 'Python 確認',
-    2: 'パッケージインストール',
-    3: 'Style-Bert-VITS2 確認',
-  };
-
-  const allStepsOk = steps[1].status === 'ok' && steps[2].status === 'ok' && steps[3].status === 'ok';
-  const notStarted = currentStep === 0;
 
   return (
     <div style={styles.container}>
       <div style={styles.title}>TikTalk セットアップ 🐻</div>
-      <div style={styles.subtitle}>はじめての設定をお手伝いします ✨</div>
+      <div style={styles.subtitle}>はじめての起動です。準備を確認します ✨</div>
 
-      {notStarted && (
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <p style={{ fontSize: 14, color: '#aaa', marginBottom: 16 }}>
-            TikTalkを使うための準備をします 📦<br />
-            ボタンを押してセットアップを開始してください！
-          </p>
-          <button style={styles.actionButton} onClick={handleStart}>
-            セットアップを開始する 🚀
+      {/* このアプリが何をするか説明 */}
+      <div style={styles.card}>
+        <div style={styles.cardTitle}>📋 このアプリについて</div>
+        <div style={styles.cardBody}>
+          TikTok LIVE のコメントを読み上げるツールです。<br />
+          <br />
+          <strong style={{ color: '#ccc' }}>このアプリが使うもの：</strong>
+          <div style={{ marginTop: 6 }}>
+            <span style={styles.tag}>localhost:5000</span> Style-Bert-VITS2（音声合成）<br />
+            <span style={styles.tag}>TikTok API</span> ライブコメント取得<br />
+            <span style={styles.tag}>AppData</span> 設定ファイル保存先
+          </div>
+          <br />
+          <strong style={{ color: '#ccc' }}>このアプリがしないこと：</strong>
+          <div style={{ marginTop: 6 }}>
+            ✗ 外部へのファイル送信<br />
+            ✗ 自動アップデートのダウンロード<br />
+            ✗ Python の自動インストール
+          </div>
+        </div>
+      </div>
+
+      {/* TTS確認ステップ */}
+      <div style={styles.card}>
+        <div style={styles.cardTitle}>🔊 Step 1 / 1: Style-Bert-VITS2 の確認</div>
+        <div style={styles.cardBody}>
+          TikTalkは音声合成に <strong style={{ color: '#ccc' }}>Style-Bert-VITS2</strong> を使います。<br />
+          先に Style-Bert-VITS2 を起動してから、下のボタンを押してください。<br />
+          <br />
+          <span style={{ color: '#888', fontSize: 12 }}>
+            ポート: <code style={{ background: '#1a1a2e', padding: '1px 6px', borderRadius: 3 }}>localhost:5000</code>
+          </span>
+        </div>
+
+        {phase === 'intro' && (
+          <button style={styles.bigBtn} onClick={handleCheck}>
+            確認する
+          </button>
+        )}
+
+        {phase === 'checking' && (
+          <div style={{ marginTop: 12, color: '#888', fontSize: 13 }}>⏳ 確認中...</div>
+        )}
+
+        {phase === 'ok' && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ ...styles.ok, fontSize: 14, marginBottom: 8 }}>
+              ✅ 接続成功！Style-Bert-VITS2 が応答しています
+            </div>
+          </div>
+        )}
+
+        {phase === 'error' && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ ...styles.error, fontSize: 13, marginBottom: 8 }}>{ttsError}</div>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>
+              Style-Bert-VITS2 が起動していない場合は、先に起動してからもう一度お試しください。<br />
+              起動方法がわからない場合は配布者に確認してください。
+            </div>
+            <button style={styles.smallBtn} onClick={handleCheck}>
+              🔄 もう一度確認する
+            </button>
+            <button
+              style={{ ...styles.smallBtn, color: '#ff9800', borderColor: '#ff9800' }}
+              onClick={handleComplete}
+            >
+              ⏭ スキップして起動（TTS無しで使う）
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 完了 */}
+      {phase === 'ok' && (
+        <div style={styles.card}>
+          <div style={styles.cardTitle}>🎉 準備完了</div>
+          <div style={{ ...styles.cardBody, marginBottom: 12 }}>
+            すべての確認が完了しました。TikTalk を起動できます。
+          </div>
+          <button style={styles.bigBtn} onClick={handleComplete}>
+            TikTalkを起動する！
           </button>
         </div>
       )}
 
-      {[1, 2, 3].map((stepNum) => {
-        const step = steps[stepNum];
-        const icon = STEP_ICONS[step.status] || '⬜';
-
-        return (
-          <div key={stepNum} style={styles.stepContainer}>
-            <div style={styles.stepHeader}>
-              <span style={styles.stepIcon}>{icon}</span>
-              <span style={styles.stepTitle}>
-                Step {stepNum}/3: {stepNames[stepNum]}
-              </span>
-              {step.status !== 'pending' && (
-                <span style={styles.stepProgress}>
-                  {step.status === 'running' ? '実行中...' :
-                   step.status === 'ok' ? '完了' :
-                   step.status === 'error' ? 'エラー' :
-                   step.status === 'waiting' ? '待機中' : ''}
-                </span>
-              )}
-            </div>
-
-            {step.message && (
-              <div style={styles.messageBox}>{step.message}</div>
-            )}
-
-            {/* エラー時のアクションボタン */}
-            {step.status === 'error' && step.action === 'install_python' && (
-              <div>
-                <button
-                  style={styles.actionButton}
-                  onClick={() => {
-                    if (window.tiktalk?.runSetup) {
-                      window.tiktalk.runSetup('install_python');
-                    }
-                  }}
-                >
-                  Pythonをインストールする 📥
-                </button>
-              </div>
-            )}
-
-            {step.status === 'waiting' && step.action === 'recheck_python' && (
-              <button style={styles.actionButton} onClick={handleRecheckPython}>
-                もう一度確認する 🔄
-              </button>
-            )}
-
-            {step.status === 'error' && step.action === 'check_tts' && (
-              <div>
-                {step.url && (
-                  <button
-                    style={styles.secondaryButton}
-                    onClick={() => {
-                      if (window.tiktalk?.runSetup) {
-                        window.tiktalk.runSetup('open_url', step.url);
-                      }
-                    }}
-                  >
-                    Style-Bert-VITS2 の GitHub 📂
-                  </button>
-                )}
-                <button style={styles.actionButton} onClick={handleCheckTTS}>
-                  もう一度確認する 🔄
-                </button>
-              </div>
-            )}
-
-            {stepNum < 3 && <hr style={styles.divider} />}
-          </div>
-        );
-      })}
-
-      {(allStepsOk || setupDone) && (
-        <button style={styles.launchButton} onClick={handleComplete}>
-          TikTalkを起動する！ 🎉
-        </button>
-      )}
+      <div style={{ marginTop: 20, fontSize: 11, color: '#555', textAlign: 'center' }}>
+        設定ファイルの保存先: %AppData%\TikTalk\<br />
+        ログ: %AppData%\TikTalk\logs\main.log
+      </div>
     </div>
   );
 }
-
-export default SetupWizard;

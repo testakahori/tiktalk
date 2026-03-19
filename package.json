@@ -1,6 +1,6 @@
 {
   "name": "tiktalk",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "TikTokゲーム配信向け読み上げデスクトップアプリ",
   "main": "electron/main.js",
   "scripts": {
@@ -16,29 +16,36 @@
     "release:major": "npm version major && git push && git push --tags"
   },
   "build": {
-    "appId": "com.tiktalk.app",
+    "appId": "com.cybertical.tiktalk",
     "productName": "TikTalk",
+    "copyright": "Copyright © 2025 TikTalk",
+    "asar": true,
+    "asarUnpack": [],
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
       "core/**/*",
-      "node_modules/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "python/",
-        "to": "python/",
-        "filter": [
-          "**/*"
-        ]
-      }
+      "node_modules/**/*",
+      "!node_modules/*/{CHANGELOG.md,README.md,readme.md,test,tests,*.test.js,*.spec.js}",
+      "!node_modules/.cache/**/*",
+      "!**/*.map"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "public/icon.png"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.png",
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "TikTalk-Setup-${version}.exe"
     },
     "nsis": {
       "oneClick": false,
@@ -50,10 +57,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "TikTalk",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "perMachine": false
     },
     "publish": {
       "provider": "github",

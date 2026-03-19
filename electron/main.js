@@ -1,6 +1,7 @@
+'use strict';
+
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const http = require('http');
@@ -18,8 +19,9 @@ const { TikTokManager } = require('../core/tiktok.js');
 const { TTSEngine } = require('../core/tts.js');
 const { AudioPlayer } = require('../core/player.js');
 
-// 設定永続化
+// 設定永続化（保存先: %AppData%\TikTalk\config.json）
 const store = new ElectronStore({
+  name: 'config',
   defaults: {
     speakerId: 0,
     speed: 1.0,
@@ -29,11 +31,13 @@ const store = new ElectronStore({
 });
 
 let mainWindow = null;
-let pythonProcess = null;
-let setupProcess = null;
 
-// セットアップ完了フラグのパス
-const SETUP_FLAG = path.join(os.homedir(), '.tiktalk_setup_done');
+// セットアップ完了フラグ（%AppData%\TikTalk\setup_done）
+const SETUP_FLAG = path.join(
+  process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
+  'TikTalk',
+  'setup_done'
+);
 
 // --- TikTokパイプライン ---
 let tiktokManager = null;
@@ -43,169 +47,67 @@ let queue = null;
 let ttsEngine = null;
 let player = null;
 let processingQueue = false;
-
-// 連投検出用: userId → コメント回数
 const userCommentCount = new Map();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 480,
     height: 700,
+    minWidth: 400,
+    minHeight: 600,
     resizable: true,
+    title: 'TikTalk',
     icon: path.join(__dirname, '..', 'public', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true, // セキュリティ強化
     },
   });
 
-  // 開発中はVite dev server、本番はビルド済みHTMLを読み込む
+  // メニューバーを非表示（本番）
+  if (app.isPackaged) {
+    mainWindow.setMenuBarVisibility(false);
+  }
+
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
+
+  mainWindow.on('closed', () => { mainWindow = null; });
 }
 
-// --- Python プロセス管理（セットアップ用に残す） ---
-
-function getPythonCommand() {
-  if (app.isPackaged) {
-    const exePath = path.join(process.resourcesPath, 'python', 'tiktok_reader.exe');
-    return { command: exePath, args: [] };
-  } else {
-    return { command: 'python', args: [path.join(__dirname, '..', 'python', 'tiktok_reader.py')] };
-  }
-}
-
-function startPythonProcess(username) {
-  if (pythonProcess) {
-    stopPythonProcess();
-  }
-
-  const { command, args } = getPythonCommand();
-  const fullArgs = [...args, username];
-
-  pythonProcess = spawn(command, fullArgs, {
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  let buffer = '';
-  pythonProcess.stdout.on('data', (data) => {
-    buffer += data.toString('utf-8');
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const msg = JSON.parse(line);
-        mainWindow?.webContents.send('comment', msg);
-      } catch {
-        // JSONパース失敗は無視
-      }
-    }
-  });
-
-  pythonProcess.stderr.on('data', (data) => {
-    const text = data.toString('utf-8').trim();
-    if (text) {
-      log.error('[Python]', text);
-      mainWindow?.webContents.send('status', { type: 'error', message: text });
-    }
-  });
-
-  pythonProcess.on('close', (code) => {
-    log.info(`[Python] プロセス終了 code=${code}`);
-    pythonProcess = null;
-    mainWindow?.webContents.send('status', { type: 'stopped', code });
-  });
-
-  pythonProcess.on('error', (err) => {
-    log.error('[Python起動エラー]', err.message);
-    mainWindow?.webContents.send('status', { type: 'error', message: `Python起動失敗: ${err.message}` });
-    pythonProcess = null;
-  });
-
-  mainWindow?.webContents.send('status', { type: 'started' });
-}
-
-function stopPythonProcess() {
-  if (pythonProcess) {
-    pythonProcess.kill('SIGTERM');
-    pythonProcess = null;
-  }
-  mainWindow?.webContents.send('status', { type: 'stopped' });
-}
-
-// --- セットアップウィザード関連 ---
-
-function getSetupPythonCommand(action) {
-  const scriptPath = path.join(__dirname, '..', 'python', 'setup_wizard.py');
-  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-  const args = [scriptPath];
-  if (action) args.push(action);
-  return { command: pythonCmd, args };
-}
-
-function runSetupWizard(action) {
-  if (setupProcess) {
-    setupProcess.kill();
-    setupProcess = null;
-  }
-
-  const { command, args } = getSetupPythonCommand(action || 'full');
-  setupProcess = spawn(command, args, {
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  let buffer = '';
-  setupProcess.stdout.on('data', (data) => {
-    buffer += data.toString('utf-8');
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const msg = JSON.parse(line);
-        mainWindow?.webContents.send('setup-progress', msg);
-      } catch {
-        // JSONパース失敗は無視
-      }
-    }
-  });
-
-  setupProcess.stderr.on('data', (data) => {
-    log.error('[Setup]', data.toString('utf-8').trim());
-  });
-
-  setupProcess.on('close', () => {
-    setupProcess = null;
-  });
-}
-
+// --- TTS疎通確認（Node.jsのみ・Python不使用） ---
 function checkTTS() {
   return new Promise((resolve) => {
-    const req = http.request(
-      { hostname: 'localhost', port: 5000, path: '/voice', method: 'HEAD', timeout: 5000 },
-      (res) => resolve(true)
-    );
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
-    req.end();
+    // /voice か /docs か /models/info に HEAD リクエスト
+    const tryPath = (pathStr) => new Promise((res) => {
+      const req = http.request(
+        { hostname: '127.0.0.1', port: 5000, path: pathStr, method: 'HEAD', timeout: 4000 },
+        () => res(true)
+      );
+      req.on('error', () => res(false));
+      req.on('timeout', () => { req.destroy(); res(false); });
+      req.end();
+    });
+
+    Promise.any([tryPath('/voice'), tryPath('/docs'), tryPath('/models/info')])
+      .then(() => resolve(true))
+      .catch(() => resolve(false));
   });
 }
 
 // --- TikTokパイプライン ---
-
 function initPipeline() {
   const ngWords = store.get('ngWords', []);
   const speakerId = store.get('speakerId', 0);
   const speed = store.get('speed', 1.0);
   const ttsBaseUrl = store.get('ttsBaseUrl', 'http://localhost:5000');
-  log.info(`[Pipeline] 初期化 speakerId=${speakerId} speed=${speed} ttsBaseUrl=${ttsBaseUrl} ngWords=${ngWords.length}件`);
+  log.info(`[Pipeline] 初期化 speakerId=${speakerId} speed=${speed} ngWords=${ngWords.length}件`);
 
   filter = new CommentFilter(ngWords);
   formatter = new CommentFormatter();
@@ -214,10 +116,7 @@ function initPipeline() {
   player = new AudioPlayer();
   userCommentCount.clear();
 
-  // キューにコメントが入ったら処理開始
-  queue.onReady(() => {
-    processNextComment();
-  });
+  queue.onReady(() => { processNextComment(); });
 }
 
 async function processNextComment() {
@@ -232,10 +131,8 @@ async function processNextComment() {
     queue.setSpeaking(true);
     mainWindow?.webContents.send('queue-size', queue.size());
 
-    // フォーマット
     const formattedText = formatter.format(comment);
 
-    // Rendererにコメント通知
     mainWindow?.webContents.send('comment', {
       userId: comment.userId,
       username: comment.username,
@@ -245,7 +142,6 @@ async function processNextComment() {
       type: comment.type,
     });
 
-    // TTS
     mainWindow?.webContents.send('status', { type: 'speaking' });
     const wavPath = await ttsEngine.speak(formattedText);
     if (wavPath) {
@@ -266,10 +162,8 @@ async function processNextComment() {
 function determinePriority(comment) {
   if (comment.type === 'gift') return Priority.GIFT;
   if (comment.type === 'member') return Priority.FIRST_COMMENT;
-
   const count = userCommentCount.get(comment.userId) || 0;
-  if (count > 0) return Priority.REPEAT_USER;
-  return Priority.NORMAL;
+  return count > 0 ? Priority.REPEAT_USER : Priority.NORMAL;
 }
 
 function startTikTok(username) {
@@ -279,24 +173,13 @@ function startTikTok(username) {
   tiktokManager = new TikTokManager();
 
   tiktokManager.on('comment', (comment) => {
-    // フィルタ
     if (filter.shouldFilter(comment)) return;
-
-    // 優先度判定
     const priority = determinePriority(comment);
-
-    // 連投カウント更新
     userCommentCount.set(comment.userId, (userCommentCount.get(comment.userId) || 0) + 1);
-
-    // _priorityをコメントに付与してキューに追加
     comment._priority = priority;
     queue.add(comment, priority);
     mainWindow?.webContents.send('queue-size', queue.size());
-
-    // キューに溜まっていて処理が止まっている場合に再開
-    if (!processingQueue) {
-      processNextComment();
-    }
+    if (!processingQueue) processNextComment();
   });
 
   tiktokManager.on('connected', () => {
@@ -323,13 +206,8 @@ function stopTikTok() {
     tiktokManager.removeAllListeners();
     tiktokManager = null;
   }
-  if (player) {
-    player.stop();
-  }
-  if (queue) {
-    queue.clear();
-    queue.setSpeaking(false);
-  }
+  if (player) player.stop();
+  if (queue) { queue.clear(); queue.setSpeaking(false); }
   processingQueue = false;
   userCommentCount.clear();
   mainWindow?.webContents.send('status', { type: 'disconnected' });
@@ -338,42 +216,27 @@ function stopTikTok() {
 
 // --- IPC ハンドラー ---
 
-// 既存: Pythonプロセス制御（セットアップ用）
-ipcMain.on('start-reader', (_event, username) => {
-  startPythonProcess(username);
-});
-
-ipcMain.on('stop-reader', () => {
-  stopPythonProcess();
-});
-
-// 新規: TikTokパイプライン制御
 ipcMain.on('start-tiktok', (_event, username) => {
+  log.info(`[IPC] start-tiktok: @${username}`);
   startTikTok(username);
 });
 
 ipcMain.on('stop-tiktok', () => {
+  log.info('[IPC] stop-tiktok');
   stopTikTok();
 });
 
-// Node.jsパイプライン制御（エイリアス）
-ipcMain.on('start-node-reader', (_event, username) => {
-  startTikTok(username);
-});
+// エイリアス（UI互換）
+ipcMain.on('start-node-reader', (_event, username) => startTikTok(username));
+ipcMain.on('stop-node-reader', () => stopTikTok());
 
-ipcMain.on('stop-node-reader', () => {
-  stopTikTok();
-});
-
-// TTS話者リスト取得
 ipcMain.handle('get-speakers', async () => {
-  const tempTts = ttsEngine || new TTSEngine({ baseUrl: store.get('ttsBaseUrl', 'http://localhost:5000') });
-  return await tempTts.getSpeakers();
+  const tts = ttsEngine || new TTSEngine({ baseUrl: store.get('ttsBaseUrl', 'http://localhost:5000') });
+  return await tts.getSpeakers();
 });
 
-// 設定の動的更新（永続化あり）
 ipcMain.on('update-settings', (_event, settings) => {
-  if (settings.ngWords) {
+  if (settings.ngWords !== undefined) {
     store.set('ngWords', settings.ngWords);
     if (filter) filter.updateNgWords(settings.ngWords);
   }
@@ -387,43 +250,46 @@ ipcMain.on('update-settings', (_event, settings) => {
   }
 });
 
-// ユーザー辞書更新
 ipcMain.on('add-user-dict', (_event, { userId, reading }) => {
-  if (formatter) {
-    formatter.updateUserDict(userId, reading);
-  }
+  if (formatter) formatter.updateUserDict(userId, reading);
 });
 
-// ログファイルを開く
+// TTS疎通確認（Node.jsのみ）
+ipcMain.handle('check-tts', async () => {
+  const ok = await checkTTS();
+  log.info(`[IPC] check-tts: ${ok}`);
+  return ok;
+});
+
+// セットアップ完了フラグを書き込む
+ipcMain.on('setup-done', () => {
+  try {
+    fs.mkdirSync(path.dirname(SETUP_FLAG), { recursive: true });
+    fs.writeFileSync(SETUP_FLAG, new Date().toISOString(), 'utf8');
+    log.info('[Setup] 完了フラグ書き込み:', SETUP_FLAG);
+  } catch (e) {
+    log.error('[Setup] フラグ書き込み失敗:', e.message);
+  }
+  mainWindow?.webContents.send('setup-completed');
+});
+
+// ログファイルをエクスプローラーで開く
 ipcMain.handle('open-log-file', async () => {
-  const logPath = log.transports.file.file;
+  const logPath = log.getLogPath();
   log.info('[IPC] ログファイルを開く:', logPath);
   await shell.openPath(logPath);
   return logPath;
 });
 
-// ログパスを取得（UIに表示用）
-ipcMain.handle('get-log-path', () => {
-  return log.transports.file.file;
-});
+ipcMain.handle('get-log-path', () => log.getLogPath());
 
-// セットアップ用IPC
-ipcMain.on('run-setup', (_event, action) => {
-  runSetupWizard(action);
-});
-
-ipcMain.handle('check-tts', async () => {
-  return await checkTTS();
-});
-
-ipcMain.on('setup-done', () => {
-  mainWindow?.webContents.send('setup-completed');
-});
-
-// セットアップ済みか確認してから起動
+// --- アプリ起動 ---
 app.whenReady().then(() => {
   log.info('[App] ウィンドウ作成');
+  log.info(`[App] ログ: ${log.getLogPath()}`);
+  log.info(`[App] 設定: ${store.path}`);
   createWindow();
+
   mainWindow.webContents.on('did-finish-load', () => {
     const setupDone = fs.existsSync(SETUP_FLAG);
     log.info(`[App] ロード完了 setupDone=${setupDone}`);
@@ -431,21 +297,11 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('ready', () => {
-  log.info(`[App] ログファイル: ${log.transports.file.file}`);
-});
-
 app.on('window-all-closed', () => {
   stopTikTok();
-  stopPythonProcess();
   app.quit();
 });
 
 app.on('before-quit', () => {
   stopTikTok();
-  stopPythonProcess();
-  if (setupProcess) {
-    setupProcess.kill();
-    setupProcess = null;
-  }
 });
