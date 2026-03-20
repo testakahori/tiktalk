@@ -1,97 +1,65 @@
-# TikTalk 🎮
+# Tiktok Talk
 
-TikTokゲーム配信向けのコメント読み上げデスクトップアプリです。
-TikTokライブのコメントをリアルタイムで取得し、Style-Bert-VITS2で自然に読み上げます。
+TikTok LIVE のコメントをリアルタイムで読み上げる Electron アプリです。
+VOICEVOX または AivisSpeech を音声エンジンとして使用します。
 
-## ダウンロードして使う（Windows）
+---
 
-### システム要件
-- **OS**: Windows 10 以上
-- **GPU**: 推奨（Style-Bert-VITS2の音声合成を高速化）
-- **メモリ**: 8GB以上推奨
+## 必要なもの
 
-### インストール手順
+- **Node.js** 18 以上
+- **VOICEVOX** または **AivisSpeech**（いずれか一方、または両方）
 
-1. [Releases](https://github.com/Nicolas0315/tiktalk/releases) から最新の `TikTalk-Setup-X.X.X.exe` をダウンロード
-2. ダウンロードしたファイルを実行（Windows SmartScreen の警告が出た場合は「詳細情報」→「実行」）
-3. インストーラーの指示に従ってインストール
+---
 
-### 追加で必要なソフトウェア
+## 音声エンジンのインストール
 
-#### Style-Bert-VITS2（音声合成サーバー）
-TikTalkはローカルで動作するTTSサーバーを使ってコメントを読み上げます。
+アプリを使用するには、音声エンジンを**公式サイトから別途インストール**してください。
 
-- **入手先**: https://github.com/litagin02/Style-Bert-VITS2
-- **セットアップ方法**: リポジトリのREADMEを参照
-- APIサーバーが `http://localhost:5000` で動作している必要があります
+### VOICEVOX
+
+**公式サイト:** https://voicevox.hiroshiba.jp/
+
+1. 上記の公式サイトにアクセスする
+2. 「ダウンロード」からWindows版インストーラー（`.exe`）をダウンロードする
+3. インストーラーを実行してインストールする
+4. インストール後、VOICEVOX を起動する（タスクトレイに常駐します）
+
+### AivisSpeech
+
+**公式サイト:** https://aivis-project.com/
+
+1. 上記の公式サイトにアクセスする
+2. Windows版インストーラー（`.exe`）をダウンロードする
+3. インストーラーを実行してインストールする
+4. インストール後、AivisSpeech を起動する
+
+> **注意:** どちらのエンジンも、Tiktok Talk を使う前に起動しておく必要があります。
+> エンジンが起動していない場合はアプリ内のエンジン設定から「▶ 起動する」ボタンで起動できます。
+
+---
 
 ## 使い方
 
-1. Style-Bert-VITS2のAPIサーバーを起動
-2. TikTalkを起動
-3. TikTokのユーザー名を入力（例: `@username`）
-4. 「配信開始」ボタンをクリック
-5. ライブ配信のコメントが自動で読み上げられます
+1. VOICEVOX または AivisSpeech を起動しておく
+2. アプリを起動する
+3. **エンジン設定** タブで使用するエンジン（VOICEVOX / AivisSpeech）を選択する
+4. 「▶ 起動する」でエンジンが未起動なら起動できる（エンジンアプリが別途必要）
+5. **TikTokアカウント** 欄に配信者の @ なしユーザー名を入力して「接続」をクリックする
+6. コメントが届くと自動で読み上げが始まる
 
-## 開発者向け
+---
 
-### 必要なもの
+## 設定項目
 
-- **Node.js** (v18以上): https://nodejs.org/
-- **Python** (3.10以上): https://www.python.org/
-- **Style-Bert-VITS2**: ローカルTTSサーバー
-
-### セットアップ
-
-```bash
-# Python依存パッケージ
-cd python
-pip install -r requirements.txt
-cd ..
-
-# Node.js依存パッケージ
-npm install
-```
-
-### 開発モードで起動
-
-ターミナルを2つ開きます。
-
-**ターミナル1: Vite dev server**
-```bash
-npm run dev
-```
-
-**ターミナル2: Electron**
-```bash
-npx electron .
-```
-
-### exe化（Windows配布用）
-
-```bash
-# アイコン生成
-npm install --save-dev sharp
-node scripts/generate-icon.js
-
-# ビルド
-npm run build
-```
-
-`release/` フォルダにインストーラーが生成されます。
-
-## よくある質問
-
-### 「Style-Bert-VITS2 が起動していません」と表示される
-Style-Bert-VITS2のAPIサーバーを先に起動してください。
-`http://localhost:5000` でアクセスできるか確認してください。
-
-### コメントが取得できない
-- ユーザー名が正しいか確認してください（@は省略可能）
-- 配信がライブ中であることを確認してください
-- インターネット接続を確認してください
-
-### TTSサーバーに接続できない
-- Style-Bert-VITS2が起動しているか確認してください
-- ポート5000が他のアプリに使われていないか確認してください
-- ファイアウォール設定で localhost:5000 がブロックされていないか確認してください
+| 項目 | 説明 |
+|---|---|
+| エンジン | VOICEVOX / AivisSpeech を切り替え |
+| 声 | 使用するキャラクターの声を選択 |
+| 速さ | 読み上げ速度（0.5〜2.0） |
+| 音量 | 音量（0〜100%） |
+| 声の高さ | ピッチ調整 |
+| 抑揚 | テンポの緩急 |
+| 入室読み上げ | 視聴者の入室を「〇〇さん、いらっしゃい」と読む |
+| 名前読み上げ | コメント主の名前も合わせて読む |
+| NGワード | 名前またはコメントに含まれると読み上げをスキップ |

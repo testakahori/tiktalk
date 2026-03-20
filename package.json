@@ -1,83 +1,27 @@
 {
-  "name": "tiktalk",
-  "version": "0.2.0",
-  "description": "TikTokゲーム配信向け読み上げデスクトップアプリ",
-  "main": "electron/main.js",
+  "name": "tiktok-talk",
+  "version": "1.0.0",
+  "description": "TikTok Live コメント読み上げアプリ",
+  "main": "main.js",
   "scripts": {
-    "dev": "vite",
-    "dev:electron": "npm run dev & sleep 2 && electron .",
-    "preinstall": "node scripts/generate-icon.js || true",
-    "build:renderer": "vite build",
-    "build:exe": "npm run build:renderer && electron-builder",
-    "build": "npm run build:exe",
-    "lint": "eslint src/",
-    "release:patch": "npm version patch && git push && git push --tags",
-    "release:minor": "npm version minor && git push && git push --tags",
-    "release:major": "npm version major && git push && git push --tags"
-  },
-  "build": {
-    "appId": "com.cybertical.tiktalk",
-    "productName": "TikTalk",
-    "copyright": "Copyright © 2025 TikTalk",
-    "asar": true,
-    "asarUnpack": [],
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "core/**/*",
-      "node_modules/**/*",
-      "!node_modules/*/{CHANGELOG.md,README.md,readme.md,test,tests,*.test.js,*.spec.js}",
-      "!node_modules/.cache/**/*",
-      "!**/*.map"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "public/icon.png",
-      "requestedExecutionLevel": "asInvoker",
-      "artifactName": "TikTalk-Setup-${version}.exe"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerLanguages": [
-        "ja"
-      ],
-      "language": "1041",
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "TikTalk",
-      "deleteAppDataOnUninstall": false,
-      "perMachine": false
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "Nicolas0315",
-      "repo": "tiktalk"
-    }
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
-    "sharp": "^0.34.5",
-    "vite": "^6.0.7"
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
   },
   "dependencies": {
-    "axios": "^1.13.6",
-    "electron-store": "^8.2.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tiktok-live-connector": "^2.1.1-beta1"
+    "tiktok-live-connector": "^2.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.tiktok-talk.app",
+    "productName": "Tiktok Talk",
+    "directories": { "output": "dist" },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "files": ["main.js", "preload.js", "src/**", "renderer/**", "build/**"]
   }
 }

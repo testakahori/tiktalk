@@ -1,5 +1,0 @@
-TikTokLive
-sounddevice
-scipy
-emoji
-requests
