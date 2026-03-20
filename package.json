@@ -1,0 +1,27 @@
+{
+  "name": "tiktok-talk",
+  "version": "1.0.0",
+  "description": "TikTok Live コメント読み上げアプリ",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "^2.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.tiktok-talk.app",
+    "productName": "Tiktok Talk",
+    "directories": { "output": "dist" },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "files": ["main.js", "preload.js", "src/**", "renderer/**", "build/**"]
+  }
+}
